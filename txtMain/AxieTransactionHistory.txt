@@ -1,0 +1,145 @@
+import requests
+import json
+import os.path
+from os import path
+from datetime import datetime
+import pandas
+from openpyxl import load_workbook
+import time
+
+tableAxieTransactions = {}
+l01 = l02 = l03 = l04 = l05 = l06 = ['']
+auction = name = priceUSD = rarity = priceLast = priceQuick = priceReasonable = pricePatient = similarAxies = ''
+url = 'https://graphql-gateway.axieinfinity.com/graphql'
+
+
+
+
+#if __name__ == "__main__":
+#    for p in range(len(listOfIds)):
+#        AxieId = listOfIds[p]
+#        AxieDetails()
+#    print(f'\033[92mDone!!!\033[0m')
+
+fileNumber = 12
+fileName = 'Axies' + str(fileNumber) + '.xlsx'
+
+howManyAxiesPerFile = 100000
+firstAxieId = 20847
+howManyId = 50000
+
+def getTable(x1):
+    global tableAxieTransactions
+    params = {
+        "axieId": x1,
+        "from": 0,
+        "size": 10
+    }
+    jsonData = """query GetAxieTransferHistory($axieId: ID!, $from: Int!, $size: Int!) {
+                      axie(axieId: $axieId) {
+                        id
+                        transferHistory(from: $from, size: $size) {
+                          ...TransferRecords
+                          __typename
+                        }
+                        ethereumTransferHistory(from: $from, size: $size) {
+                         ...TransferRecords
+                         __typename
+                        }
+                        __typename
+                      }
+                    }
+
+                    fragment TransferRecords on TransferRecords {
+                      total
+                      results {
+                        from
+                        to
+                        timestamp
+                        txHash
+                        withPrice
+                        __typename
+                      }
+                      __typename
+                    }"""
+    areUDone = None
+    while areUDone == None:
+        try:
+            tableAxieTransactions = requests.post(url, json={"query": jsonData, "variables": params})
+            print('Tohle:' + str(tableAxieTransactions.json()['data']['axie']['ethereumTransferHistory']['total']))
+            areUDone = "Yes"
+        except Exception as b:
+            print(b)
+
+def getFromTable(x1):
+    global l01, l02, l03, l04, l05, l06, df
+    now = datetime.now()
+    l01 = [now.strftime("%d/%m/%Y %H:%M:%S")]  # dateTime
+    l02 = [str(NewId)]  # id
+    l03 = [str(tableAxieTransactions.json()['data']['axie']['ethereumTransferHistory']['results'][x1]['withPrice'])]  # howMuch
+    l04 = [str(tableAxieTransactions.json()['data']['axie']['ethereumTransferHistory']['results'][x1]['timestamp'])]  # timeStamp
+    l05 = [str(tableAxieTransactions.json()['data']['axie']['ethereumTransferHistory']['results'][x1]['from'])]  # from
+    l06 = [str(tableAxieTransactions.json()['data']['axie']['ethereumTransferHistory']['results'][x1]['to'])]  # to
+
+    df = pandas.DataFrame({'dateTime': l01, 'id': l02, 'howMuch': l03, 'timeStamp': l04, 'from': l05, 'to': l06})
+    book = load_workbook(fileName)
+    writer = pandas.ExcelWriter(fileName, engine='openpyxl')
+    writer.book = book
+    writer.sheets = {ws.title: ws for ws in book.worksheets}
+    for sheetname in writer.sheets:
+        df.to_excel(writer, sheet_name=sheetname, startrow=writer.sheets[sheetname].max_row, index=False, header=False)
+    writer.save()
+
+def getFromEmptyTable():
+    global l01, l02, l03, l04, l05, l06, df
+    now = datetime.now()
+    l01 = [now.strftime("%d/%m/%Y %H:%M:%S")]  # dateTime
+    l02 = [str(NewId)]  # id
+    l03 = ["N/A"]  # howMuch
+    l04 = ["N/A"]  # timeStamp
+    l05 = ["N/A"]  # from
+    l06 = ["N/A"]  # to
+
+    df = pandas.DataFrame({'dateTime': l01, 'id': l02, 'howMuch': l03, 'timeStamp': l04, 'from': l05, 'to': l06})
+    book = load_workbook(fileName)
+    writer = pandas.ExcelWriter(fileName, engine='openpyxl')
+    writer.book = book
+    writer.sheets = {ws.title: ws for ws in book.worksheets}
+    for sheetname in writer.sheets:
+        df.to_excel(writer, sheet_name=sheetname, startrow=writer.sheets[sheetname].max_row, index=False, header=False)
+    writer.save()
+
+if __name__ == "__main__":
+    NewId = firstAxieId
+    for p in range(howManyId):
+        if p % howManyAxiesPerFile == 0:
+            fileNumber += 1
+            fileName = 'Axies' + str(fileNumber) + '.xlsx'
+            print(fileName)
+
+        if path.exists(fileName) != True:  # If the xlsx table doesn't exist yet, it creates it
+            df = pandas.DataFrame({'dateTime': l01, 'id': l02, 'howMuch': l03, 'timeStamp': l04, 'from': l05, 'to': l06})
+            df.to_excel(fileName, sheet_name='sheet1', index=False)
+
+        print(NewId)
+        getTable(NewId)
+        success = None
+        while success is None:
+            try:
+                print('I tried')
+                if tableAxieTransactions.json()['data']['axie']['ethereumTransferHistory']['results'] != []:
+                    for i in range(tableAxieTransactions.json()['data']['axie']['ethereumTransferHistory']['total']):
+                        print(i+1)
+                        getFromTable(i)
+                        success = 'Done'
+                else:
+                    getFromEmptyTable()
+                    success = 'Done'
+            except Exception as e:
+                print(e)
+                time.sleep(10)
+
+
+        tableAxieTransactions = {}
+        NewId += 1
+    print(f'\033[92mDone!!!\033[0m')

@@ -1,0 +1,1 @@
+dateTime, name, id, price, level, hp, skill, speed, morale, breedCount, stage, title, bodyShape, birthDate, class, Eyes, Ears, Back, Mouth, Horn, Tail, rarity, priceLast, priceQuick, priceReasonable, pricePatient, similarAxie
